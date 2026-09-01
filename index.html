@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>디지털 슬로건 제작기 · SchoolKit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<style>
+  :root{ --chip:clamp(0.95rem, 1.25vw + 0.45rem, 1.35rem); }
+  html,body{height:100%;font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;background:#F8FAFC;}
+  body{display:flex;flex-direction:column;overflow-x:hidden;}
+  *{word-break:keep-all;box-sizing:border-box;}
+  .chip{transition:all .18s ease;min-width:0;font-size:var(--chip);}
+  .chip:not(.on):not(.dim):hover{transform:translateY(-3px);}
+  .chip:active{transform:scale(.94);}
+  .chip.dim{opacity:.22;pointer-events:none;}
+  .fade{animation:fade .3s ease both;}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .pop{animation:pop .45s cubic-bezier(.2,.9,.3,1.3) both;}
+  @keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+  button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  /* 화면이 낮으면 잘리지 않고 스크롤 */
+  #scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+  #full{position:fixed;inset:0;z-index:60;display:none;flex-direction:column;overflow-y:auto;
+        background:linear-gradient(135deg,#ECFDF5,#F0FDFA,#F5F3FF);}
+  #full.show{display:flex;}
+  .slogan-max{font-size:clamp(1.9rem,6.5vw,6.5rem);line-height:1.18;}
+  /* 세로 공간이 넉넉할 때만 칸을 늘려 빈 곳을 없앤다 */
+  @media (min-height:640px){ #grid{height:100%;} }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="shrink-0 text-white shadow-md" style="background:linear-gradient(90deg,#059669,#10B981,#14B8A6)">
+  <div class="w-full px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+    <div class="flex items-baseline gap-2 sm:gap-3 flex-wrap min-w-0">
+      <a id="brand" href="#" target="_blank" rel="noopener"
+         class="bg-white font-extrabold text-[11px] px-2.5 py-1 rounded-full self-center shrink-0 active:scale-95 transition-all hover:shadow-md"
+         style="color:#059669">SchoolKit</a>
+      <h1 class="text-lg sm:text-xl lg:text-2xl font-extrabold">디지털 슬로건 제작기</h1>
+      <p class="hidden md:block text-sm lg:text-base font-bold text-white/90">클릭 한 번에도 나의 가치를 — 우리는 디지털 시민</p>
+    </div>
+    <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+      <button id="list" title="저장된 슬로건 보기"
+        class="rounded-full px-3 py-1.5 text-xs sm:text-sm font-extrabold active:scale-95 transition-all whitespace-nowrap shadow-sm"
+        style="background:#fff;color:#7C3AED">🗂 모아보기 <span id="listCount">0</span></button>
+      <div class="flex items-center gap-1.5 flex-wrap" id="stepbar"></div>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="flex-1 min-h-0 w-full px-2 sm:px-4 py-2 sm:py-3 flex">
+  <section id="screen" class="w-full bg-white rounded-3xl shadow-lg p-3 sm:p-4 lg:p-5 flex flex-col min-h-0"></section>
+</main>
+
+<!-- 전체화면 슬로건 -->
+<div id="full">
+  <div class="flex-1 flex items-center justify-center px-5 py-8 text-center">
+    <p id="fullText" class="slogan-max font-extrabold" style="color:#0F172A"></p>
+  </div>
+  <div class="px-3 pb-4 shrink-0">
+    <div id="fullTags" class="flex flex-wrap justify-center gap-2 mb-3"></div>
+    <div class="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-3">
+      <div class="lg:col-span-3 rounded-3xl p-4 sm:p-5 text-left" style="background:rgba(255,255,255,.75)">
+        <p class="text-base sm:text-lg font-extrabold mb-2" style="color:#D97706">✍️ 종이에 적어 주세요</p>
+        <ol class="text-sm sm:text-base text-slate-700 grid grid-cols-1 md:grid-cols-3 gap-2 list-decimal list-inside font-semibold">
+          <li>위 슬로건 그대로 옮겨 적기</li>
+          <li>이 가치를 고른 이유 한 줄</li>
+          <li>우리 반이 어떻게 달라질지 한 줄</li>
+        </ol>
+      </div>
+      <button id="restart" class="rounded-3xl px-5 py-4 sm:py-5 text-lg sm:text-xl font-extrabold text-white active:scale-95 transition-all"
+        style="background:#059669;box-shadow:0 8px 22px rgba(5,150,105,.4)">다음 사람 시작하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Script -->
+<script>
+/* ===== SchoolKit 홈 주소 : 이 한 줄만 바꾸면 됩니다 ===== */
+const SCHOOLKIT_URL = "https://snackscience.github.io/easy-school/";
+
+/* ===== 저장 : 이 기기(브라우저) 안에 쌓입니다 ===== */
+const STORE_KEY = "schoolkit-slogan-v1";
+function loadAll(){
+  try{ return JSON.parse(localStorage.getItem(STORE_KEY)||"[]"); }catch(e){ return []; }
+}
+function saveOne(rec){
+  try{ const a=loadAll(); a.push(rec); localStorage.setItem(STORE_KEY, JSON.stringify(a)); }catch(e){}
+}
+function clearAll(){ try{ localStorage.removeItem(STORE_KEY); }catch(e){} }
+function stamp(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function downloadCSV(){
+  const rows=loadAll();
+  if(!rows.length){ alert("저장된 슬로건이 없습니다."); return; }
+  const esc=s=>`"${String(s).replace(/"/g,'""')}"`;
+  const csv="\uFEFF"+["번호,시각,슬로건,가치1,가치2,실천1,실천2"]
+    .concat(rows.map((r,i)=>[i+1,r.t,r.s,r.v[0],r.v[1],r.a[0],r.a[1]].map(esc).join(",")))
+    .join("\n");
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
+  const a=document.createElement("a");
+  a.href=url; a.download=`디지털슬로건_${stamp().replace(/[: ]/g,"-")}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+const PAL={
+  rose   :{bg:"#FFF1F2", fg:"#E11D48"},
+  amber  :{bg:"#FFFBEB", fg:"#D97706"},
+  sky    :{bg:"#F0F9FF", fg:"#0284C7"},
+  violet :{bg:"#F5F3FF", fg:"#7C3AED"},
+  emerald:{bg:"#ECFDF5", fg:"#059669"},
+  teal   :{bg:"#F0FDFA", fg:"#0D9488"},
+  orange :{bg:"#FFF7ED", fg:"#EA580C"}
+};
+
+const VALUES=[
+ {g:"관계",c:"rose",list:["존중","배려","공감","경청","친절","예의","포용"]},
+ {g:"책임",c:"amber",list:["책임감","정직","신뢰","용기","약속 지키기"]},
+ {g:"보호",c:"sky",list:["타인 보호","권리 존중","존엄성","안전한 공유","저작권 인식"]},
+ {g:"판단",c:"violet",list:["비판적 사고","공정성","자율성","사실 기반 공유"]},
+ {g:"공존",c:"emerald",list:["협력","나눔","소통","다양성","공동체의식","연대"]},
+ {g:"웰빙",c:"teal",list:["절제","감정 조절","디지털 웰빙"]}
+];
+
+const ACTIONS=[
+ {g:"태도",c:"rose",list:[["따뜻하게","warm"],["다정하게","warm"],["부드럽게","warm"],["정성껏","warm"],["진심으로","warm"]]},
+ {g:"자세",c:"amber",list:[["꾸준하게","steady"],["성실하게","steady"],["차분하게","calm"],["겸손하게","calm"],["솔직하게","steady"]]},
+ {g:"판단",c:"violet",list:[["비판적으로","calm"],["신중하게","calm"],["꼼꼼하게","calm"],["현명하게","calm"],["공정하게","calm"],["균형 있게","calm"]]},
+ {g:"에너지",c:"orange",list:[["즐겁게","lively"],["신나게","lively"],["밝게","lively"],["활기차게","lively"],["긍정적으로","lively"],["당당하게","lively"]]},
+ {g:"의지",c:"sky",list:[["용기 있게","bold"],["적극적으로","bold"],["자신 있게","bold"],["주도적으로","bold"]]},
+ {g:"함께",c:"emerald",list:[["함께","together"],["서로 도우며","together"],["마음 모아","together"],["응원하며","together"]]}
+];
+
+const CONFLICT={ calm:["lively","bold"], lively:["calm"], bold:["calm"] };
+const FLATV=VALUES.flatMap(s=>s.list.map(n=>({n,grp:s.g,col:s.c})));
+const FLATA=ACTIONS.flatMap(s=>s.list.map(([n,t])=>({n,t,grp:s.g,col:s.c})));
+const findV=n=>FLATV.find(x=>x.n===n), findA=n=>FLATA.find(x=>x.n===n);
+
+let step=1, pickedV=[], pickedA=[], cands=[], finalSlogan="";
+
+function jong(w){w=w.trim();const c=w.charCodeAt(w.length-1);
+  if(c<0xAC00||c>0xD7A3)return false;return (c-0xAC00)%28!==0;}
+function J(w,a,b){return w+(jong(w)?a:b);}
+function toneClash(){
+  if(pickedA.length<2) return false;
+  const [x,y]=pickedA.map(findA);
+  return (CONFLICT[x.t]||[]).includes(y.t)||(CONFLICT[y.t]||[]).includes(x.t);
+}
+
+/* ============================================================
+   문장 로직
+   1) 행동어(부사)는 반드시 동사 앞에만 온다 → '성실한 존엄성' 방지
+   2) 가치(명사)는 목적어 또는 ~과/~으로 로만 쓴다
+   3) 동사는 어떤 추상 명사와도 붙는 것만 사용
+   4) 가치와 행동어의 말이 겹치면 짝을 바꾸거나 그 패턴을 버린다
+   5) '~으로'로 끝나는 행동어는 '~으로' 자리 패턴에서 제외
+   ============================================================ */
+const V1BANK=["지키는","실천하는","만드는"];
+const V2BANK=["키우는","나누는","이어가는"];
+function verb(bank,v){ return bank.find(x=>!v.includes(x.slice(0,2)))||bank[bank.length-1]; }
+const wordClash=(v,a)=>v.includes(a.slice(0,2));
+const endsRo=a=>/으로$|[가-힣]로$/.test(a);
+
+/* 학생들이 직접 만든 슬로건 6개의 구조를 그대로 틀로 삼는다.
+   ① 예의와 겸손으로 배우고 절제와 책임으로 성장하는 디지털 시민
+   ② 작은 절제, 큰 다양성 - 모두의 디지털 매너
+   ③ 디지털에서 절제와 존중으로, 따뜻한 소통을 만들어가요!
+   ④ 클릭 한 번의 예의, 디지털 세상을 살아가는 매너
+   ⑤ 디지털 속 자유, 책임이 함께 갑니다
+   ⑥ 좋은 디지털은 나로부터 시작된다                          */
+const PATTERNS=[
+ {sep:1,ro:1,f:(v1,v2,a1,a2)=>`${J(v1,'으로','로')} ${a1} 배우고, ${J(v2,'으로','로')} ${a2} 성장하는 디지털 시민`},
+ {sep:1,ro:0,f:(v1,v2,a1,a2)=>`${a1} ${verb(V1BANK,v1)} ${v1}, ${a2} ${verb(V2BANK,v2)} ${v2} — 모두의 디지털 매너`},
+ {sep:0,ro:1,f:(v1,v2,a1,a2)=>`디지털에서 ${J(v1,'과','와')} ${J(v2,'으로','로')}, ${a1}, ${a2} 함께 나아가요!`},
+ {sep:0,ro:0,f:(v1,v2,a1,a2)=>`클릭 한 번의 ${v1}, 댓글 한 줄의 ${v2} — ${a1}, ${a2} 살아가는 디지털 시민`},
+ {sep:1,ro:0,f:(v1,v2,a1,a2)=>`${a1} ${verb(V1BANK,v1)} ${v1}, ${a2} ${verb(V2BANK,v2)} ${J(v2,'이','가')} 함께 갑니다`},
+ {sep:1,ro:0,f:(v1,v2,a1,a2)=>`좋은 디지털은 ${J(v1,'과','와')} ${J(v2,'을','를')} ${a1} 배우고 ${a2} 실천하는 나로부터 시작된다`}
+];
+
+function shuffle(x){x=[...x];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}return x;}
+
+function makeCandidates(){
+  const clash=toneClash(), roBad=pickedA.some(endsRo);
+  const pool=PATTERNS.filter(p=>(!clash||p.sep)&&(!p.ro||!roBad));
+  const out=[];
+  for(const p of shuffle(pool)){
+    if(out.length>=3) break;
+    for(const flip of shuffle([0,1])){
+      let v=flip?[pickedV[1],pickedV[0]]:[pickedV[0],pickedV[1]];
+      let a=flip?[pickedA[1],pickedA[0]]:[pickedA[0],pickedA[1]];
+      if(wordClash(v[0],a[0])||wordClash(v[1],a[1])) a=[a[1],a[0]];
+      if(wordClash(v[0],a[0])||wordClash(v[1],a[1])) continue;
+      const s=p.f(v[0],v[1],a[0],a[1]);
+      if(!out.includes(s)){ out.push(s); break; }
+    }
+  }
+  const fb=[
+    `${pickedA[0]} ${verb(V1BANK,pickedV[0])} ${pickedV[0]}, ${pickedA[1]} ${verb(V2BANK,pickedV[1])} ${pickedV[1]} — 모두의 디지털 매너`,
+    `좋은 디지털은 ${J(pickedV[0],'과','와')} ${J(pickedV[1],'을','를')} ${pickedA[0]} 배우고 ${pickedA[1]} 실천하는 나로부터 시작된다`,
+    `${pickedA[0]} ${verb(V1BANK,pickedV[0])} ${pickedV[0]}, ${pickedA[1]} ${verb(V2BANK,pickedV[1])} ${J(pickedV[1],'이','가')} 함께 갑니다`
+  ];
+  for(const s of fb){ if(out.length>=3) break; if(!out.includes(s)) out.push(s); }
+  cands=out.slice(0,3);
+}
+
+function renderCount(){
+  const c=document.getElementById('listCount');
+  if(c) c.textContent=loadAll().length;
+}
+
+function renderStepBar(){
+  const labels=["가치","실천","슬로건"];
+  document.getElementById('stepbar').innerHTML=labels.map((t,i)=>{
+    const n=i+1, done=step>n, now=step===n;
+    let st="background:rgba(255,255,255,.2);color:rgba(255,255,255,.75)";
+    if(done) st="background:rgba(255,255,255,.4);color:#fff";
+    if(now)  st="background:#fff;color:#059669;box-shadow:0 6px 16px rgba(0,0,0,.15)";
+    return `<div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:text-sm font-extrabold" style="${st}">
+      <span class="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[10px]" style="background:${now?'#D1FAE5':'rgba(255,255,255,.25)'}">${n}</span>${t}</div>`;
+  }).join('<span class="text-white/50 text-xs">›</span>');
+}
+
+/* ===== 상단 조작 버튼 ===== */
+const homeBtn = `<button id="home" title="처음으로"
+  class="rounded-2xl px-3.5 sm:px-4 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold active:scale-95 transition-all whitespace-nowrap"
+  style="background:#ECFDF5;color:#047857">⌂ 처음으로</button>`;
+
+function navBtns(){
+  if(step===1){
+    return `<div class="flex items-center gap-2 sm:gap-3 shrink-0">
+      ${homeBtn}
+      <span class="text-sm sm:text-lg font-extrabold whitespace-nowrap" style="color:${pickedV.length===2?'#059669':'#94A3B8'}">${pickedV.length} / 2</span>
+      <button id="next" ${pickedV.length<2?'disabled':''}
+        class="rounded-2xl px-5 sm:px-7 py-2.5 sm:py-3.5 text-base sm:text-xl font-extrabold text-white active:scale-95 transition-all whitespace-nowrap"
+        style="background:${pickedV.length<2?'#CBD5E1':'#059669'};${pickedV.length<2?'':'box-shadow:0 6px 18px rgba(5,150,105,.4)'}">다음 ›</button>
+    </div>`;
+  }
+  if(step===2){
+    return `<div class="flex items-center gap-2 sm:gap-3 shrink-0">
+      ${homeBtn}
+      <button id="back" class="rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold text-slate-600 bg-slate-100 active:scale-95 transition-all whitespace-nowrap">‹ 이전</button>
+      <span class="text-sm sm:text-lg font-extrabold whitespace-nowrap" style="color:${pickedA.length===2?'#059669':'#94A3B8'}">${pickedA.length} / 2</span>
+      <button id="next" ${pickedA.length<2?'disabled':''}
+        class="rounded-2xl px-5 sm:px-7 py-2.5 sm:py-3.5 text-base sm:text-xl font-extrabold text-white active:scale-95 transition-all whitespace-nowrap"
+        style="background:${pickedA.length<2?'#CBD5E1':'#059669'};${pickedA.length<2?'':'box-shadow:0 6px 18px rgba(5,150,105,.4)'}">슬로건 만들기 ›</button>
+    </div>`;
+  }
+  return `<div class="flex items-center gap-2 sm:gap-3 shrink-0">
+    ${homeBtn}
+    <button id="back" class="rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold text-slate-600 bg-slate-100 active:scale-95 transition-all whitespace-nowrap">‹ 이전</button>
+    <button id="reroll" class="rounded-2xl px-5 sm:px-7 py-2.5 sm:py-3.5 text-base sm:text-xl font-extrabold text-white active:scale-95 transition-all whitespace-nowrap"
+      style="background:#EA580C;box-shadow:0 6px 20px rgba(234,88,12,.45)">↻ 다시 만들기</button>
+  </div>`;
+}
+
+function head(title,sub){
+  return `<div class="shrink-0 flex items-start justify-between gap-3 mb-2.5 sm:mb-3 flex-wrap">
+    <div class="min-w-0">
+      <h2 class="text-lg sm:text-2xl lg:text-3xl font-extrabold text-slate-800">${title}</h2>
+      <p class="text-xs sm:text-base text-slate-500">${sub}</p>
+    </div>
+    ${navBtns()}
+  </div>`;
+}
+
+/* ===== 칩 : 반응형 격자 ===== */
+function chips(data,picked,kind){
+  return `<div id="scroll" class="flex-1 min-h-0">
+    <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
+    ${data.map(sec=>{
+      const P=PAL[sec.c];
+      const items = kind==='v' ? sec.list.map(n=>({n})) : sec.list.map(([n,t])=>({n,t}));
+      return `<div class="rounded-3xl p-2 sm:p-2.5 lg:p-3 shadow-sm min-w-0 flex flex-col" style="background:${P.bg}">
+        <p class="text-sm sm:text-base lg:text-lg font-extrabold mb-1.5 sm:mb-2 text-center shrink-0" style="color:${P.fg}">${sec.g}</p>
+        <div class="flex flex-col justify-start gap-1.5 sm:gap-2">
+          ${items.map(it=>{
+            const on=picked.includes(it.n);
+            const dim=!on&&picked.length>=2;
+            const st=on
+              ? `background:${P.fg};color:#fff;box-shadow:0 8px 20px ${P.fg}55`
+              : `background:#fff;color:#334155;box-shadow:0 1px 3px rgba(0,0,0,.08)`;
+            return `<button data-kind="${kind}" data-val="${it.n}"
+              class="chip shrink-0 w-full ${dim?'dim':''} rounded-2xl px-1 py-2.5 sm:py-3 lg:py-3.5 font-extrabold leading-tight"
+              style="${st}">${it.n}</button>`;
+          }).join('')}
+        </div>
+      </div>`;}).join('')}
+    </div>
+  </div>`;
+}
+
+function render(){
+  renderStepBar(); renderCount();
+  const full=document.getElementById('full'), el=document.getElementById('screen');
+  el.className="w-full bg-white rounded-3xl shadow-lg p-3 sm:p-4 lg:p-5 flex flex-col min-h-0 fade";
+
+  if(step===4){
+    document.getElementById('fullText').textContent=finalSlogan;
+    document.getElementById('fullTags').innerHTML=
+      pickedV.map(v=>{const p=PAL[findV(v).col];return `<span class="rounded-2xl text-sm sm:text-lg font-extrabold px-3 sm:px-4 py-1.5 sm:py-2" style="background:${p.bg};color:${p.fg}">${v}</span>`;}).join('')+
+      pickedA.map(a=>{const p=PAL[findA(a).col];return `<span class="rounded-2xl text-sm sm:text-lg font-extrabold px-3 sm:px-4 py-1.5 sm:py-2" style="background:${p.bg};color:${p.fg}">${a}</span>`;}).join('');
+    full.classList.add('show','pop'); bindFull(); return;
+  }
+  full.classList.remove('show','pop');
+
+  if(step===5){
+    const rows=loadAll().slice().reverse();
+    el.innerHTML=`
+      <div class="shrink-0 flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div class="min-w-0">
+          <h2 class="text-lg sm:text-2xl lg:text-3xl font-extrabold text-slate-800">🗂 모아보기 · 지금까지 ${rows.length}개</h2>
+          <p class="text-xs sm:text-base text-slate-500">이 기기에 저장된 슬로건입니다. 최근 것이 위에 있어요.</p>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button id="csv" class="rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold text-white active:scale-95 transition-all whitespace-nowrap"
+            style="background:#0284C7">⬇ 엑셀로 받기</button>
+          <button id="wipe" class="rounded-2xl px-4 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold active:scale-95 transition-all whitespace-nowrap"
+            style="background:#FFF1F2;color:#E11D48">전체 지우기</button>
+          <button id="home" class="rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3.5 text-base sm:text-lg font-extrabold active:scale-95 transition-all whitespace-nowrap"
+            style="background:#ECFDF5;color:#047857">⌂ 처음으로</button>
+        </div>
+      </div>
+      <div id="scroll" class="flex-1 min-h-0">
+        ${rows.length ? `<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          ${rows.map((r,i)=>`
+            <div class="rounded-3xl p-4 sm:p-5 shadow-sm" style="background:#F8FAFC">
+              <p class="text-xs font-bold text-slate-400 mb-1.5">${rows.length-i}번 · ${r.t}</p>
+              <p class="font-extrabold leading-snug mb-3" style="color:#1E293B;font-size:clamp(1rem,1.1vw + .6rem,1.4rem)">${r.s}</p>
+              <div class="flex flex-wrap gap-1.5">
+                ${r.v.map(v=>{const p=PAL[(findV(v)||{col:'emerald'}).col];return `<span class="rounded-xl text-xs font-extrabold px-2.5 py-1" style="background:${p.bg};color:${p.fg}">${v}</span>`;}).join('')}
+                ${r.a.map(a=>{const p=PAL[(findA(a)||{col:'teal'}).col];return `<span class="rounded-xl text-xs font-extrabold px-2.5 py-1" style="background:${p.bg};color:${p.fg}">${a}</span>`;}).join('')}
+              </div>
+            </div>`).join('')}
+        </div>`
+        : `<div class="h-full flex flex-col items-center justify-center text-center py-16">
+             <p class="text-5xl mb-3">🗂</p>
+             <p class="text-lg font-extrabold text-slate-500">아직 만들어진 슬로건이 없어요.</p>
+             <p class="text-sm text-slate-400 mt-1">첫 번째 슬로건을 만들어 보세요!</p>
+           </div>`}
+      </div>`;
+    bind(); return;
+  }
+
+  if(step===1){
+    el.innerHTML = head(`1단계 · 소중한 가치 <span style="color:#059669">2개</span> 고르기`,
+                        `디지털 세상에서 내가 가장 지키고 싶은 것은?`)
+                 + chips(VALUES,pickedV,'v');
+  }
+  else if(step===2){
+    el.innerHTML = head(`2단계 · 실천 방법 <span style="color:#059669">2개</span> 고르기`,
+                        `고른 가치 · <span class="font-extrabold" style="color:#059669">${pickedV.join(' · ')}</span>`)
+                 + chips(ACTIONS,pickedA,'a');
+  }
+  else{
+    el.innerHTML = head(`3단계 · 마음에 드는 슬로건 고르기`,
+                        `<span class="font-extrabold" style="color:#059669">${pickedV.join(' · ')}</span> + <span class="font-extrabold" style="color:#0D9488">${pickedA.join(' · ')}</span>`)
+      + `<div id="scroll" class="flex-1 min-h-0">
+          <div class="h-full grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+          ${cands.map((c,i)=>{
+            const t=[["#FFF1F2","#E11D48"],["#F5F3FF","#7C3AED"],["#ECFDF5","#059669"]][i%3];
+            return `<button data-pick="${i}"
+              class="pop h-full min-h-[130px] text-left rounded-3xl p-4 sm:p-6 lg:p-7 flex flex-col justify-center
+              active:scale-95 shadow-md hover:shadow-2xl hover:-translate-y-2 transition-all duration-200"
+              style="background:${t[0]};animation-delay:${i*80}ms">
+              <span class="inline-block self-start text-xs sm:text-sm font-extrabold rounded-full px-2.5 py-0.5 mb-2 sm:mb-3" style="background:${t[1]};color:#fff">후보 ${i+1}</span>
+              <p class="font-extrabold leading-snug" style="color:#1E293B;font-size:clamp(1.15rem,2vw + .5rem,2.2rem)">${c}</p>
+            </button>`;}).join('')}
+          </div>
+        </div>`;
+  }
+  bind();
+}
+
+function goHome(){ step=1;pickedV=[];pickedA=[];cands=[];finalSlogan="";render(); }
+
+function bind(){
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    const arr=b.dataset.kind==='v'?pickedV:pickedA;
+    const v=b.dataset.val,i=arr.indexOf(v);
+    if(i>-1) arr.splice(i,1); else if(arr.length<2) arr.push(v);
+    render();
+  });
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
+    finalSlogan=cands[+b.dataset.pick];
+    saveOne({ s:finalSlogan, v:[...pickedV], a:[...pickedA], t:stamp() });
+    step=4; render();
+  });
+  const nx=document.getElementById('next');
+  if(nx) nx.onclick=()=>{ if(step===2) makeCandidates(); step++; render(); };
+  const bk=document.getElementById('back'); if(bk) bk.onclick=()=>{step--;render();};
+  const re=document.getElementById('reroll'); if(re) re.onclick=()=>{makeCandidates();render();};
+  const hm=document.getElementById('home'); if(hm) hm.onclick=goHome;
+  const ls=document.getElementById('list'); if(ls) ls.onclick=()=>{step=5;render();};
+  const cs=document.getElementById('csv'); if(cs) cs.onclick=downloadCSV;
+  const wp=document.getElementById('wipe'); if(wp) wp.onclick=()=>{
+    if(confirm("저장된 슬로건을 모두 지웁니다. 되돌릴 수 없어요. 계속할까요?")){ clearAll(); render(); }
+  };
+}
+function bindFull(){
+  document.getElementById('restart').onclick=goHome;
+}
+
+document.getElementById('brand').href = SCHOOLKIT_URL;
+render();
+</script>
+</body>
+</html>
